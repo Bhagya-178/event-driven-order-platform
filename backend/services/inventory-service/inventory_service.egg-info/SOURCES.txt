@@ -1,7 +1,0 @@
-pyproject.toml
-app/main.py
-inventory_service.egg-info/PKG-INFO
-inventory_service.egg-info/SOURCES.txt
-inventory_service.egg-info/dependency_links.txt
-inventory_service.egg-info/requires.txt
-inventory_service.egg-info/top_level.txt

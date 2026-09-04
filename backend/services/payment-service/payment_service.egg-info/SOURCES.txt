@@ -1,7 +1,0 @@
-pyproject.toml
-app/main.py
-payment_service.egg-info/PKG-INFO
-payment_service.egg-info/SOURCES.txt
-payment_service.egg-info/dependency_links.txt
-payment_service.egg-info/requires.txt
-payment_service.egg-info/top_level.txt
