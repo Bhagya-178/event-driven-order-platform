@@ -45,7 +45,15 @@
 12. [What Makes This Project Production-Level?](#12-what-makes-this-project-production-level)
 13. [Comprehensive Testing Suite & Verification Matrix](#13-comprehensive-testing-suite--verification-matrix)
 14. [Recommended Implementation Order & Status](#14-recommended-implementation-order--status)
-15. [Quickstart & Running Tests](#15-quickstart--running-tests)
+15. [Quickstart & Automated Test Execution](#15-quickstart--automated-test-execution)
+    * 15.1 [Prerequisites & Environment Setup](#151-prerequisites--environment-setup)
+    * 15.2 [Starting Local Infrastructure (Docker)](#152-starting-local-infrastructure-docker)
+    * 15.3 [One-Click Test Runners (All 55 Tests)](#153-one-click-test-runners-all-55-tests)
+    * 15.4 [Running Tests by Individual Microservice](#154-running-tests-by-individual-microservice)
+    * 15.5 [Targeted Testing by Distributed Systems Category](#155-targeted-testing-by-distributed-systems-category)
+    * 15.6 [Targeting Individual Tests & Debugging Flags](#156-targeting-individual-tests--debugging-flags)
+    * 15.7 [In-Memory SQLite Mechanics & Live Kafka Testing](#157-in-memory-sqlite-mechanics--live-kafka-testing)
+16. [Load Testing, Performance Benchmarking & Operational Runbook](#16-load-testing-performance-benchmarking--operational-runbook)
 
 ---
 
@@ -806,52 +814,280 @@ PHASE 6 ──► Concurrency & Failure / Chaos Testing (COMPLETED)
    ↓
 PHASE 7 ──► Redis + Observability + Docker (COMPLETED)
    ↓
-PHASE 8 ──► Load Testing + Final Documentation (IN PROGRESS)
+PHASE 8 ──► Load Testing + Runbooks & Benchmarking (COMPLETED)
 ```
 
 ---
 
-## 15. Quickstart & Running Tests
+## 15. Quickstart & Automated Test Execution
 
-### Prerequisites
-* Python 3.11+
-* Docker & Docker Compose
+The platform is backed by **55 tests** across 4 packages with **100% green rate**. The test suite evaluates ACID transactions, row-level locking, consumer idempotency, dead-letter routing, and Redis caching.
 
-### 1. Environment Setup
+For architectural test design patterns and CI/CD details, see the dedicated [Comprehensive Testing Guide (docs/TESTING.md)](docs/TESTING.md).
+
+---
+
+### 15.1 Prerequisites & Environment Setup
+
+* **Python Version:** 3.11+ or 3.14
+* **Containerization:** Docker & Docker Compose (optional for unit/integration tests; required for live cluster)
+* **Virtual Environment:** Ensure test dependencies (`fastapi`, `sqlalchemy`, `aiosqlite`, `pytest`, `pytest-asyncio`, `httpx`, `pydantic`) are installed.
+
 ```bash
+# 1. Copy environment template (never commit secrets)
 cp .env.example .env
 ```
 
-### 2. Launch Infrastructure (Docker)
+---
+
+### 15.2 Starting Local Infrastructure (Docker)
+
+To launch PostgreSQL, Redis, Kafka, and Prometheus containers locally:
+
 ```bash
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
-### 3. Run Automated Tests
+> **Note:** Unit and integration tests run entirely against fast in-memory SQLite fixtures (`sqlite+aiosqlite:///:memory:`). You can run all 55 tests **without** running Docker.
 
-Run each service's automated test suite:
+---
 
+### 15.3 One-Click Test Runners (All 55 Tests)
+
+#### Option A: Windows PowerShell
+Execute all 55 tests across all 4 services with clear colored status headers:
+
+```powershell
+Write-Host "=== 1. SHARED FOUNDATION (10 Tests) ===" -ForegroundColor Cyan
+$env:PYTHONPATH="backend/shared"
+& "backend/services/order-service/.venv/Scripts/python.exe" -m pytest backend/shared/tests/ -q
+
+Write-Host "`n=== 2. ORDER SERVICE (21 Tests) ===" -ForegroundColor Cyan
+$env:PYTHONPATH="backend/shared;backend/services/order-service"
+$env:ORDER_DB_URL="sqlite+aiosqlite:///:memory:"
+& "backend/services/order-service/.venv/Scripts/python.exe" -m pytest backend/services/order-service/tests/ -q
+
+Write-Host "`n=== 3. PAYMENT SERVICE (11 Tests) ===" -ForegroundColor Cyan
+$env:PYTHONPATH="backend/shared;backend/services/payment-service"
+$env:PAYMENT_DB_URL="sqlite+aiosqlite:///:memory:"
+& "backend/services/order-service/.venv/Scripts/python.exe" -m pytest backend/services/payment-service/tests/ -q
+
+Write-Host "`n=== 4. INVENTORY SERVICE (13 Tests) ===" -ForegroundColor Cyan
+$env:PYTHONPATH="backend/shared;backend/services/inventory-service"
+$env:INVENTORY_DB_URL="sqlite+aiosqlite:///:memory:"
+& "backend/services/order-service/.venv/Scripts/python.exe" -m pytest backend/services/inventory-service/tests/ -q
+```
+
+#### Option B: Linux / macOS / Bash
 ```bash
-# 1. Shared package tests (10 tests)
+# 1. Shared (10 tests)
+PYTHONPATH="backend/shared" pytest backend/shared/tests/ -q
+
+# 2. Order Service (21 tests)
+PYTHONPATH="backend/shared:backend/services/order-service" \
+ORDER_DB_URL="sqlite+aiosqlite:///:memory:" \
+pytest backend/services/order-service/tests/ -q
+
+# 3. Payment Service (11 tests)
+PYTHONPATH="backend/shared:backend/services/payment-service" \
+PAYMENT_DB_URL="sqlite+aiosqlite:///:memory:" \
+pytest backend/services/payment-service/tests/ -q
+
+# 4. Inventory Service (13 tests)
+PYTHONPATH="backend/shared:backend/services/inventory-service" \
+INVENTORY_DB_URL="sqlite+aiosqlite:///:memory:" \
+pytest backend/services/inventory-service/tests/ -q
+```
+
+**Expected Result:** `54 passed, 1 skipped (live Kafka broker integration) in ~2.5 seconds`.
+
+---
+
+### 15.4 Running Tests by Individual Microservice
+
+To focus on a specific microservice during development:
+
+#### 1. Shared Foundation Package (`backend/shared` &mdash; 10 Tests)
+Verifies Event Envelopes, Causation IDs, DeadLetterEnvelopes, retry wrappers, rate limiters, and logging:
+```bash
 cd backend/shared
 pytest tests/ -v
+```
 
-# 2. Order Service tests (20 tests)
-cd ../services/order-service
-pytest tests/integration/ -v
-
-# 3. Payment Service tests (11 tests)
-cd ../payment-service
-pytest tests/integration/ -v
-
-# 4. Inventory Service tests (13 tests)
-cd ../inventory-service
+#### 2. Order Service (`backend/services/order-service` &mdash; 21 Tests)
+Verifies outbox relays with `SKIP LOCKED`, concurrent idempotency races, cross-topic state machine races, poison pills, and Redis invalidation:
+```bash
+cd backend/services/order-service
 pytest tests/integration/ -v
 ```
 
-**Single PowerShell Command to Run All 55 Tests:**
+#### 3. Payment Service (`backend/services/payment-service` &mdash; 11 Tests)
+Verifies multi-worker outbox polling, payment API idempotency, gateway failure retries, and DLQ routing:
+```bash
+cd backend/services/payment-service
+pytest tests/integration/ -v
+```
+
+#### 4. Inventory Service (`backend/services/inventory-service` &mdash; 13 Tests)
+Verifies 20 concurrent reservation requests with zero overselling, optimistic locking retry loops, stock releases, and DLQ isolation:
+```bash
+cd backend/services/inventory-service
+pytest tests/integration/ -v
+```
+
+---
+
+### 15.5 Targeted Testing by Distributed Systems Category
+
+Run cross-service tests targeting specific engineering guarantees using pytest expression filters (`-k`) or file targets:
+
+* **Concurrency & Race Conditions:**
+  ```powershell
+  pytest backend/services/order-service/tests/integration/test_concurrency.py -v
+  pytest backend/services/payment-service/tests/integration/test_concurrency.py -v
+  pytest backend/services/inventory-service/tests/integration/test_concurrency.py -v
+  ```
+* **Failure Recovery & Chaos (Poison Pills & Broker Outages):**
+  ```powershell
+  pytest backend/services/order-service/tests/integration/test_failure.py -v
+  pytest backend/services/payment-service/tests/integration/test_failure.py -v
+  pytest backend/services/inventory-service/tests/integration/test_failure.py -v
+  ```
+* **Resilience, Retries & Dead-Letter Queues (DLQ):**
+  ```powershell
+  pytest backend/shared/tests/test_schemas.py -k "retry_and_dlq" -v
+  pytest backend/services/order-service/tests/integration/test_resilience.py -v
+  pytest backend/services/payment-service/tests/integration/test_resilience.py -v
+  pytest backend/services/inventory-service/tests/integration/test_resilience.py -v
+  ```
+* **Transactional Outbox Relaying:**
+  ```powershell
+  pytest backend/services/order-service/tests/integration/test_outbox.py -v
+  pytest backend/services/payment-service/tests/integration/test_outbox.py -v
+  pytest backend/services/inventory-service/tests/integration/test_outbox.py -v
+  ```
+* **Observability & Health Probes (`/metrics`, `/health/ready`):**
+  ```powershell
+  pytest backend/shared/tests/test_observability.py -v
+  pytest backend/services/order-service/tests/integration/test_observability.py -v
+  pytest backend/services/payment-service/tests/integration/test_observability.py -v
+  pytest backend/services/inventory-service/tests/integration/test_observability.py -v
+  ```
+
+---
+
+### 15.6 Targeting Individual Tests & Debugging Flags
+
+Use pytest flags for rapid debugging:
+
 ```powershell
-Write-Host "=== SHARED (10 Tests) ==="; cd backend/shared; $env:PYTHONPATH="."; pytest tests/ -q; Write-Host "`n=== ORDER-SERVICE (21 Tests) ==="; cd ../services/order-service; $env:PYTHONPATH="..\..\shared"; $env:ORDER_DB_URL="sqlite+aiosqlite:///:memory:"; pytest tests/ -q; Write-Host "`n=== PAYMENT-SERVICE (11 Tests) ==="; cd ../payment-service; $env:PYTHONPATH="..\..\shared;."; $env:PAYMENT_DB_URL="sqlite+aiosqlite:///:memory:"; pytest tests/ -q; Write-Host "`n=== INVENTORY-SERVICE (13 Tests) ==="; cd ../inventory-service; $env:PYTHONPATH="..\..\shared;."; $env:INVENTORY_DB_URL="sqlite+aiosqlite:///:memory:"; pytest tests/ -q; cd ../../..
+# 1. Run a single specific test function
+pytest backend/services/inventory-service/tests/integration/test_concurrency.py::test_concurrent_inventory_reservations_overselling_prevention -v
+
+# 2. Show print statements and live logs in console (-s)
+pytest backend/services/order-service/tests/integration/test_concurrency.py -s -v
+
+# 3. Stop immediately on first test failure (-x)
+pytest backend/services/order-service/tests/ -x
+
+# 4. Filter by test name keyword substring (-k)
+pytest backend/services/order-service/tests/ -k "idempotency" -v
 ```
 
-**Total Test Suite: 55 tests (54 automated tests passing with 100% green rate, 1 skipped live broker integration).**
+---
+
+### 15.7 In-Memory SQLite Mechanics & Live Kafka Testing
+
+#### In-Memory SQLite Concurrency Simulation:
+* Tests use `sqlite+aiosqlite:///:memory:` with SQLAlchemy's `StaticPool` to avoid external database dependencies.
+* Because SQLite in-memory shares a single connection, concurrent transactions acquire an asynchronous mutex (`_sqlite_lock`) during tests to simulate serialized commits.
+* In production on PostgreSQL, `_sqlite_lock` is bypassed entirely, utilizing native row-level pessimistic locks (`SELECT ... FOR UPDATE`) and optimistic version columns.
+
+#### Running Live Kafka Broker Tests:
+One test (`test_kafka_consumer.py`) is skipped by default during unit testing. To execute against a live broker:
+
+1. Start Kafka via Docker: `docker-compose -f docker-compose.dev.yml up -d`
+2. Run the integration test:
+   ```powershell
+   $env:KAFKA_BOOTSTRAP_SERVERS="localhost:9092"
+   pytest backend/services/order-service/tests/integration/test_kafka_consumer.py -v
+   ```
+
+
+---
+
+## 16. Load Testing, Performance Benchmarking & Operational Runbook
+
+The platform includes a production load testing suite and a detailed operational incident response runbook.
+
+### 1. Standalone Headless Async Benchmark Runner
+
+A high-performance CLI benchmark tool located at [`backend/load_tests/run_benchmark.py`](backend/load_tests/run_benchmark.py) evaluates system throughput (RPS), error rates, HTTP status distributions, and latency percentiles (p50, p90, p95, p99) headlessly in the terminal:
+
+```bash
+# Benchmark Order Service (20 concurrent workers, 100 requests)
+python backend/load_tests/run_benchmark.py --target-url http://localhost:8000 -c 20 -n 100 --scenario orders
+
+# Benchmark Redis Cache & Read Path Latency
+python backend/load_tests/run_benchmark.py --target-url http://localhost:8000 -c 50 -n 500 --scenario lookup
+
+# Stress Test Rate Limiting (Sliding-Window HTTP 429 verification)
+python backend/load_tests/run_benchmark.py --target-url http://localhost:8000 -c 30 -n 200 --scenario ratelimit
+```
+
+**Benchmark Sample Output:**
+```text
+=================================================================
+       EVENT-DRIVEN ORDER PLATFORM - PERFORMANCE BENCHMARK       
+=================================================================
+Target URL:          http://localhost:8000
+Scenario:            orders
+Concurrency Level:   20 virtual workers
+Total Requests:      100
+Completed in:        1.420 seconds
+Throughput:          70.42 req/sec (RPS)
+-----------------------------------------------------------------
+LATENCY DISTRIBUTION (Milliseconds):
+  Min:                  12.40 ms
+  Mean:                 18.15 ms
+  50th Percentile:      16.20 ms (p50)
+  90th Percentile:      24.80 ms (p90)
+  95th Percentile:      31.10 ms (p95)
+  99th Percentile:      42.50 ms (p99)
+  Max:                  48.30 ms
+-----------------------------------------------------------------
+HTTP STATUS CODES:
+  HTTP 201:             100 (100.0%)
+-----------------------------------------------------------------
+PRODUCTION SLA CRITERIA:
+  p95 < 200ms:       [PASS] (31.1ms)
+  Error Rate < 5%:   [PASS] (0.0%)
+  Overall Status:    READY FOR PRODUCTION
+=================================================================
+```
+
+### 2. Multi-Persona Locust Load Testing Suite
+
+The Locust test suite located at [`backend/load_tests/locustfile.py`](backend/load_tests/locustfile.py) simulates enterprise traffic distributions across four concurrent personas:
+
+* **`OrderPlacementUser` (Weight 3):** Simulates standard buyers creating orders with unique `Idempotency-Key` headers, polling order lifecycle status, and retrying duplicate orders to test idempotency guarantees.
+* **`OrderLookupUser` (Weight 5):** High-frequency reads stressing Redis cache hit latency and validating sub-millisecond retrieval.
+* **`InventoryContentionUser` (Weight 2):** Flash-sale concurrency stress on shared inventory stock testing optimistic concurrency control and retry loops.
+* **`ThrottledAttackerUser` (Weight 1):** Burst requests verifying the Redis sliding-window limiter enforces 100 req/min limits with `HTTP 429 Too Many Requests` and `Retry-After` headers.
+
+**Running Locust:**
+```bash
+# Install load test requirements
+pip install -r backend/load_tests/requirements.txt
+
+# Start Locust with Web UI on http://localhost:8089
+locust -f backend/load_tests/locustfile.py --host http://localhost:8000
+
+# Or run headlessly in terminal:
+locust -f backend/load_tests/locustfile.py --host http://localhost:8000 --headless -u 50 -r 10 --run-time 1m
+```
+
+### 3. SRE & Incident Response Runbook
+
+For production incident management, dead-letter queue recovery, outbox scaling, and Redis fail-open degradation playbooks, consult the comprehensive [Operational Runbook](docs/RUNBOOK.md).
+
