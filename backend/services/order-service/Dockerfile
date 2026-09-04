@@ -1,0 +1,53 @@
+# Multi-stage Dockerfile for Order Service
+# Stage 1: Build & Dependencies
+FROM python:3.11-slim as builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/shared /build/backend/shared
+COPY backend/services/order-service /build/backend/services/order-service
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -e /build/backend/shared && \
+    pip install --no-cache-dir -r /build/backend/services/order-service/requirements.txt \
+    redis prometheus-client
+
+# Stage 2: Runtime
+FROM python:3.11-slim as runner
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Run as non-root user
+RUN addgroup --system appgroup && adduser --system --group appuser
+
+COPY --from=builder /opt/venv /opt/venv
+COPY backend/shared /app/backend/shared
+COPY backend/services/order-service /app/backend/services/order-service
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="/app/backend/services/order-service:/app/backend/shared"
+
+USER appuser
+WORKDIR /app/backend/services/order-service
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health/live || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
