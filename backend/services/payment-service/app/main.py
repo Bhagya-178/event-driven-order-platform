@@ -8,6 +8,12 @@ from shared.observability.logging import setup_structured_logging
 from shared.observability.metrics import PrometheusMiddleware, metrics_response
 from shared.redis.rate_limiter import RateLimiter, RateLimiterMiddleware
 
+import app.models.payment
+import app.models.outbox
+import app.models.processed_event
+from app.db.base import Base
+from app.db.session import engine
+
 from app.api.routes import payments, health
 from app.core.config import settings
 from app.core.redis import redis_manager
@@ -19,6 +25,11 @@ setup_structured_logging("payment-service", level=settings.LOG_LEVEL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"Warning: Payment DB init: {e}")
     await redis_manager.connect()
     await payment_producer.start()
     await payment_consumer.start()
@@ -28,6 +39,7 @@ async def lifespan(app: FastAPI):
     await payment_consumer.stop()
     await payment_producer.stop()
     await redis_manager.close()
+
 
 app = FastAPI(title="Payment Service", version="0.1.0", lifespan=lifespan)
 

@@ -8,6 +8,15 @@ from shared.observability.logging import setup_structured_logging
 from shared.observability.metrics import PrometheusMiddleware, metrics_response
 from shared.redis.rate_limiter import RateLimiter, RateLimiterMiddleware
 
+import uuid
+from sqlalchemy import select
+import app.models.inventory
+import app.models.outbox
+import app.models.processed_event
+from app.db.base import Base
+from app.db.session import engine, AsyncSessionLocal
+from app.models.inventory import Inventory
+
 from app.api.routes import inventory, health
 from app.core.config import settings
 from app.core.redis import redis_manager
@@ -19,6 +28,23 @@ setup_structured_logging("inventory-service", level=settings.LOG_LEVEL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(Inventory))
+            if not res.scalars().first():
+                catalog_ids = [
+                    uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                    uuid.UUID("22222222-2222-2222-2222-222222222222"),
+                    uuid.UUID("33333333-3333-3333-3333-333333333333"),
+                    uuid.UUID("44444444-4444-4444-4444-444444444444"),
+                ]
+                for cid in catalog_ids:
+                    session.add(Inventory(product_id=cid, available_quantity=100, reserved_quantity=0))
+                await session.commit()
+    except Exception as e:
+        print(f"Warning: Inventory DB init / seed: {e}")
     await redis_manager.connect()
     await inventory_producer.start()
     await inventory_consumer.start()
@@ -28,6 +54,7 @@ async def lifespan(app: FastAPI):
     await inventory_consumer.stop()
     await inventory_producer.stop()
     await redis_manager.close()
+
 
 app = FastAPI(title="Inventory Service", version="0.1.0", lifespan=lifespan)
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, LayoutDashboard, Cpu } from 'lucide-react';
+import { ShoppingCart, Activity, Layers, Server, ShieldCheck } from 'lucide-react';
 
 interface NavbarProps {
   currentView: 'customer' | 'business';
@@ -17,75 +17,81 @@ export const Navbar: React.FC<NavbarProps> = ({
   backendOnline,
 }) => {
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#090d16]/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-[#0b0c10]/95 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Brand Logo & Tag */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Cpu className="w-5 h-5 text-white" />
+          {/* Brand & System Architecture Badge */}
+          <div className="flex items-center space-x-3.5">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-700/80 flex items-center justify-center shadow-inner">
+              <Layers className="w-4 h-4 text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-extrabold tracking-tight text-white text-lg">NovaCloud</span>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-                  Event-Driven
+                <span className="font-semibold tracking-tight text-zinc-100 text-sm">
+                  NEXUS <span className="text-zinc-500 font-normal">EVENT PLATFORM</span>
+                </span>
+                <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/60">
+                  v1.4.0
                 </span>
               </div>
-              <p className="text-xs text-slate-400 hidden sm:block">Kafka Saga Architecture</p>
+              <div className="flex items-center space-x-2 text-[11px] text-zinc-400 font-mono">
+                <span>PostgreSQL 15</span>
+                <span className="text-zinc-600">&bull;</span>
+                <span>Kafka 7.5</span>
+                <span className="text-zinc-600">&bull;</span>
+                <span>Redis 7</span>
+              </div>
             </div>
           </div>
 
-          {/* Central Portal Switcher */}
-          <div className="flex items-center p-1 bg-slate-900/90 rounded-xl border border-slate-800">
+          {/* Central Portal Switcher (Clean Segmented Control) */}
+          <div className="flex items-center p-0.5 bg-zinc-900/90 rounded-lg border border-zinc-800 text-xs">
             <button
               onClick={() => onSwitchView('customer')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md font-medium transition-all ${
                 currentView === 'customer'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
+              <ShoppingCart className="w-3.5 h-3.5" />
               <span>Customer Storefront</span>
             </button>
 
             <button
               onClick={() => onSwitchView('business')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-md font-medium transition-all ${
                 currentView === 'business'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60'
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Business Console</span>
+              <Activity className="w-3.5 h-3.5" />
+              <span>SRE & Saga Operations</span>
             </button>
           </div>
 
           {/* Right Action: Cluster Status & Cart */}
           <div className="flex items-center space-x-3">
-            {/* Cluster Health Pill */}
-            <div className="hidden md:flex items-center space-x-2 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs">
-              <span className={`w-2 h-2 rounded-full ${backendOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-              <span className="text-slate-300 text-[11px] font-medium">
-                {backendOnline ? 'Cluster Active' : 'Offline / Standalone'}
+            {/* Real-time Health Badge */}
+            <div className="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs font-mono">
+              <span className={`w-1.5 h-1.5 rounded-full ${backendOnline ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-rose-500'}`} />
+              <span className="text-zinc-300 text-[11px]">
+                {backendOnline ? 'CLUSTER OPERATIONAL' : 'SYSTEM DEGRADED'}
               </span>
             </div>
 
-            {/* Cart Button (Visible on Customer view) */}
+            {/* Cart Trigger (Customer Portal) */}
             {currentView === 'customer' && (
               <button
                 onClick={onOpenCart}
-                className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 transition-all"
-                title="View Cart"
+                className="relative flex items-center space-x-2 px-3 py-1.5 rounded-md bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/60 text-zinc-200 text-xs font-medium transition-all"
               >
-                <ShoppingBag className="w-5 h-5 text-indigo-400" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#090d16]">
-                    {cartCount}
-                  </span>
-                )}
+                <ShoppingCart className="w-3.5 h-3.5 text-zinc-300" />
+                <span className="hidden sm:inline">Cart</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${cartCount > 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'}`}>
+                  {cartCount}
+                </span>
               </button>
             )}
           </div>
@@ -94,3 +100,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

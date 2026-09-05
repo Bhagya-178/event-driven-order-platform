@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ShoppingBag, CheckCircle2, ArrowRight, 
-  Zap, Shield, Plus, Minus, Trash2, RefreshCw
+  CheckCircle2, ArrowRight, ShieldCheck, 
+  Plus, Minus, Trash2, RefreshCw, Terminal, 
+  AlertCircle, ShoppingCart
 } from 'lucide-react';
 import { CATALOG_PRODUCTS, createOrder, listOrders, listInventory } from '../services/api';
 import { Order } from '../types';
@@ -29,8 +30,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
-  // Fetch initial inventory and recent orders
   const refreshData = async () => {
     try {
       const [fetchedOrders, fetchedInv] = await Promise.all([
@@ -45,7 +46,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       });
       setInventory(invMap);
     } catch (err) {
-      console.warn("Failed to refresh customer data:", err);
+      console.warn("Telemetry refresh warning:", err);
     }
   };
 
@@ -63,6 +64,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setSubmitting(true);
+    setOrderError(null);
     const idempotencyKey = crypto.randomUUID();
 
     try {
@@ -80,135 +82,168 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       onClearCart();
       refreshData();
     } catch (err: any) {
-      alert(`Checkout failed: ${err.message}`);
+      setOrderError(err.message || "Failed to commit order transaction.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-12">
-      {/* Hero Banner */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-8 sm:p-12 shadow-2xl">
-        <div className="relative z-10 max-w-2xl">
-          <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 uppercase tracking-wider">
-            Next-Gen Infrastructure Hardware
-          </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mt-4">
-            Enterprise Cloud Hardware Storefront
-          </h1>
-          <p className="text-slate-300 mt-3 text-sm sm:text-base leading-relaxed">
-            Order enterprise nodes, quantum tensor accelerators, and persistent event clusters backed by ACID transactions and distributed Kafka sagas.
+    <div className="space-y-8">
+      {/* Enterprise Header Ribbon */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-zinc-800">
+        <div>
+          <div className="flex items-center space-x-2.5">
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+              Enterprise Infrastructure Storefront
+            </h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              ACID • Kafka Saga
+            </span>
+          </div>
+          <p className="text-xs text-zinc-400 mt-1">
+            Production hardware procurement with optimistic locking, transactional outbox publishing, and distributed compensation.
           </p>
         </div>
 
-        {/* Decorative Background Grid */}
-        <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-      </section>
+        <div className="flex items-center space-x-4 font-mono text-xs text-zinc-400">
+          <div className="flex items-center space-x-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Zero-Oversell Engine</span>
+          </div>
+          <span className="text-zinc-700">|</span>
+          <div>P99 SLA: &lt;50ms</div>
+        </div>
+      </div>
 
-      {/* Active Order Banner (If just placed) */}
+      {/* Order Commit Alert / Telemetry Launcher */}
       {activeOrder && (
-        <section className="p-6 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 shadow-xl transition-all">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start space-x-3">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <CheckCircle2 className="w-6 h-6" />
+        <div className="rounded-lg bg-zinc-900/90 border border-emerald-500/30 p-5 shadow-lg">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <span className="font-bold text-white text-base">Order Placed Successfully!</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <span className="font-semibold text-zinc-100 text-sm">Order Committed Successfully</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     {activeOrder.status}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-mono mt-1">
-                  Order ID: {activeOrder.id} &bull; Total: ${activeOrder.total_amount} {activeOrder.currency}
-                </p>
-                {lastLatencyMs !== null && (
-                  <p className="text-[11px] text-emerald-400 mt-1">
-                    Atomic database commit in {lastLatencyMs}ms (Redis cache & Kafka outbox staged)
-                  </p>
-                )}
+                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono mt-1">
+                  <span>Order ID: <span className="text-zinc-200">{activeOrder.id}</span></span>
+                  <span>&bull;</span>
+                  <span>Amount: <span className="text-zinc-200">${parseFloat(activeOrder.total_amount).toLocaleString()} USD</span></span>
+                  {lastLatencyMs !== null && (
+                    <>
+                      <span>&bull;</span>
+                      <span className="text-emerald-400">Response Latency: {lastLatencyMs}ms</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* The Magic Button requested by user */}
             <button
               onClick={() => onOpenTrace(activeOrder.id)}
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all self-start sm:self-center"
+              className="flex items-center space-x-2 px-4 py-2 rounded-md text-xs font-semibold bg-zinc-100 hover:bg-white text-zinc-950 transition-colors shadow-sm self-start md:self-center"
             >
-              <Zap className="w-4 h-4 text-cyan-300" />
-              <span>Inspect Distributed Saga & Kafka Trace</span>
-              <ArrowRight className="w-4 h-4" />
+              <Terminal className="w-3.5 h-3.5 text-zinc-800" />
+              <span>Inspect Saga & Kafka Telemetry</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        </section>
+        </div>
+      )}
+
+      {/* Order Submission Error Banner */}
+      {orderError && (
+        <div className="rounded-lg bg-rose-950/30 border border-rose-500/40 p-4 text-xs flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-rose-200">Transaction Rejection:</span>
+            <p className="text-rose-300 font-mono mt-0.5">{orderError}</p>
+          </div>
+        </div>
       )}
 
       {/* Product Catalog Grid */}
       <section>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-white">Available Products</h2>
-            <p className="text-xs text-slate-400">Live stock synchronized with distributed inventory database</p>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              Hardware Fleet Catalog
+            </h2>
+            <span className="text-xs font-mono text-zinc-500">({CATALOG_PRODUCTS.length} SKUs Active)</span>
           </div>
-          <span className="text-xs text-slate-400 font-mono">{CATALOG_PRODUCTS.length} Models Ready</span>
+          <span className="text-xs text-zinc-400 font-mono">Live Sync: PostgreSQL Inventory</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {CATALOG_PRODUCTS.map((prod) => {
-            const stock = inventory[prod.product_id] ?? 25;
+            const stock = inventory[prod.product_id] ?? 100;
             const inCart = cart.find(c => c.productId === prod.product_id)?.quantity || 0;
 
             return (
               <div
                 key={prod.product_id}
-                className="rounded-2xl bg-[#0e1424] border border-slate-800/80 p-5 flex flex-col justify-between hover:border-slate-700 transition-all hover:shadow-xl hover:shadow-indigo-500/5 group"
+                className="rounded-lg bg-[#11131b] border border-zinc-800/90 p-4 flex flex-col justify-between hover:border-zinc-700 transition-colors"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-800 text-indigo-400 border border-slate-700">
+                  {/* Category & Stock Pill */}
+                  <div className="flex items-center justify-between mb-3 text-[11px]">
+                    <span className="font-mono text-zinc-400 text-[10px] uppercase tracking-wide">
                       {prod.category}
                     </span>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      stock > 5 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    <span className={`font-mono text-[10px] px-2 py-0.5 rounded border ${
+                      stock > 10 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         : stock > 0
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                     }`}>
-                      {stock > 0 ? `${stock} in stock` : 'Out of Stock'}
+                      {stock > 0 ? `${stock} AVAILABLE` : 'DEPLETED'}
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-white text-base group-hover:text-indigo-400 transition-colors">
+                  {/* Title & SKU */}
+                  <h3 className="font-semibold text-zinc-100 text-sm leading-snug">
                     {prod.name}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-2 line-clamp-2">
+                  <p className="text-[11px] font-mono text-zinc-500 mt-1">
+                    SKU: {prod.sku}
+                  </p>
+
+                  <p className="text-xs text-zinc-400 mt-2.5 leading-relaxed line-clamp-2">
                     {prod.description}
                   </p>
-                  <p className="text-[11px] text-slate-500 font-mono mt-2.5">
+
+                  <div className="mt-3 py-2 px-2.5 rounded bg-zinc-900/80 border border-zinc-800/80 font-mono text-[10px] text-zinc-400">
                     {prod.specs}
-                  </p>
+                  </div>
                 </div>
 
-                <div className="pt-5 border-t border-slate-800/60 mt-4 flex items-center justify-between">
+                {/* Pricing & Add Action */}
+                <div className="pt-4 border-t border-zinc-800/80 mt-4 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400">Price</span>
-                    <p className="text-lg font-extrabold text-white">${prod.price.toFixed(2)}</p>
+                    <span className="text-[10px] uppercase font-mono text-zinc-500 block">Unit Price</span>
+                    <span className="text-base font-bold text-zinc-100 font-mono">
+                      ${prod.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
                   </div>
 
                   <button
                     onClick={() => onAddToCart(prod.product_id)}
                     disabled={stock <= 0}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center space-x-1.5 transition-colors ${
                       stock > 0
-                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        ? 'bg-zinc-100 hover:bg-white text-zinc-900'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                     }`}
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>{inCart > 0 ? `In Cart (${inCart})` : 'Add to Cart'}</span>
+                    <span>{inCart > 0 ? `In Cart (${inCart})` : 'Add'}</span>
                   </button>
                 </div>
               </div>
@@ -217,60 +252,66 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         </div>
       </section>
 
-      {/* Shopping Cart Drawer / Checkout Card */}
+      {/* Shopping Cart & Idempotency Checkout Console */}
       {cart.length > 0 && (
-        <section className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-2xl">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <div className="flex items-center space-x-2">
-              <ShoppingBag className="w-5 h-5 text-indigo-400" />
-              <h2 className="text-lg font-bold text-white">Your Shopping Cart ({cart.length} items)</h2>
+        <section className="rounded-lg bg-[#11131b] border border-zinc-800 p-5 shadow-xl">
+          <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800">
+            <div className="flex items-center space-x-2.5">
+              <ShoppingCart className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-sm font-semibold text-zinc-100">
+                Pending Procurement Order ({cart.reduce((s, i) => s + i.quantity, 0)} items)
+              </h2>
             </div>
             <button
               onClick={onClearCart}
-              className="text-xs text-slate-400 hover:text-rose-400 transition-colors"
+              className="text-xs text-zinc-500 hover:text-rose-400 font-mono transition-colors"
             >
-              Clear Cart
+              [Clear All]
             </button>
           </div>
 
-          <div className="divide-y divide-slate-800/60 my-4">
+          <div className="divide-y divide-zinc-800/60 my-3 font-mono text-xs">
             {cart.map(item => {
               const prod = CATALOG_PRODUCTS.find(p => p.product_id === item.productId);
               if (!prod) return null;
 
               return (
-                <div key={item.productId} className="py-3 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-semibold text-white">{prod.name}</h4>
-                    <p className="text-xs text-slate-400">${prod.price.toFixed(2)} each</p>
+                <div key={item.productId} className="py-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-zinc-500"># {prod.sku}</span>
+                    <span className="text-zinc-200 font-sans font-medium">{prod.name}</span>
                   </div>
 
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2 bg-[#090d16] px-2 py-1 rounded-lg border border-slate-800">
+                  <div className="flex items-center space-x-5">
+                    <span className="text-zinc-400">
+                      ${prod.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} &times; {item.quantity}
+                    </span>
+
+                    <div className="flex items-center space-x-1.5 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
                       <button
                         onClick={() => onUpdateCartQty(item.productId, -1)}
-                        className="p-1 text-slate-400 hover:text-white"
+                        className="p-1 text-zinc-400 hover:text-white"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="text-xs font-mono font-bold text-slate-200 px-1">{item.quantity}</span>
+                      <span className="font-bold text-zinc-200 px-1">{item.quantity}</span>
                       <button
                         onClick={() => onUpdateCartQty(item.productId, 1)}
-                        className="p-1 text-slate-400 hover:text-white"
+                        className="p-1 text-zinc-400 hover:text-white"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
 
-                    <span className="text-sm font-bold text-white w-16 text-right">
-                      ${(prod.price * item.quantity).toFixed(2)}
+                    <span className="font-bold text-zinc-100 w-24 text-right">
+                      ${(prod.price * item.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
 
                     <button
                       onClick={() => onRemoveFromCart(item.productId)}
-                      className="text-slate-500 hover:text-rose-400 p-1"
+                      className="text-zinc-500 hover:text-rose-400 p-1 transition-colors"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -278,41 +319,50 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             })}
           </div>
 
-          {/* Checkout Footer */}
-          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center space-x-2 text-xs text-slate-400">
-              <span>Customer UUID:</span>
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-                className="bg-[#090d16] text-slate-300 rounded-lg px-2.5 py-1.5 border border-slate-700 font-mono text-xs focus:outline-none focus:border-indigo-500"
-              >
-                <option value="c1010000-0000-0000-0000-000000000101">Customer Alpha (Default)</option>
-                <option value="c1010000-0000-0000-0000-000000000102">Customer Beta</option>
-                <option value="c1010000-0000-0000-0000-000000000103">Customer Gamma</option>
-              </select>
+          {/* Checkout Controls */}
+          <div className="pt-4 border-t border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="text-zinc-400">Customer Tenant:</span>
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  className="bg-zinc-900 text-zinc-200 rounded px-2.5 py-1 border border-zinc-700 font-mono text-xs focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="c1010000-0000-0000-0000-000000000101">Alpha Corp (0000-0101)</option>
+                  <option value="c1010000-0000-0000-0000-000000000102">Beta Holdings (0000-0102)</option>
+                  <option value="c1010000-0000-0000-0000-000000000103">Gamma Research (0000-0103)</option>
+                </select>
+              </div>
+
+              <span className="text-zinc-600 hidden sm:inline">&bull;</span>
+              <span className="font-mono text-[11px] text-zinc-500">
+                Idempotency Header: Auto-generated UUID v4
+              </span>
             </div>
 
             <div className="flex items-center space-x-6">
               <div className="text-right">
-                <span className="text-xs text-slate-400 block">Total Due</span>
-                <span className="text-2xl font-black text-white">${totalCartAmount.toFixed(2)}</span>
+                <span className="text-[10px] font-mono uppercase text-zinc-500 block">Total Commitment</span>
+                <span className="text-xl font-bold font-mono text-zinc-100">
+                  ${totalCartAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+                </span>
               </div>
 
               <button
                 onClick={handleCheckout}
                 disabled={submitting}
-                className="px-6 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-xl shadow-indigo-600/30 flex items-center space-x-2 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-md font-medium text-xs bg-emerald-500 hover:bg-emerald-400 text-zinc-950 flex items-center space-x-2 transition-colors disabled:opacity-50"
               >
                 {submitting ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Processing Saga...</span>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Executing Saga Transaction...</span>
                   </>
                 ) : (
                   <>
-                    <Shield className="w-4 h-4" />
-                    <span>Place Order (Idempotent)</span>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Authorize & Commit Order</span>
                   </>
                 )}
               </button>
@@ -321,77 +371,81 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         </section>
       )}
 
-      {/* Customer Orders History */}
-      <section className="p-6 rounded-2xl bg-[#0e1424] border border-slate-800">
+      {/* Enterprise Orders Audit Ledger */}
+      <section className="rounded-lg bg-[#11131b] border border-zinc-800 p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-white">Recent Orders</h2>
-            <p className="text-xs text-slate-400">Served with sub-millisecond Redis cache invalidation</p>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              Recent Transactions Ledger
+            </h2>
+            <p className="text-xs text-zinc-500">Direct PostgreSQL read with Redis dynamic cache invalidation</p>
           </div>
           <button
             onClick={refreshData}
-            className="flex items-center space-x-1 text-xs text-indigo-400 hover:text-indigo-300"
+            className="flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
+            <span>Sync</span>
           </button>
         </div>
 
         {orders.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 text-xs">
-            No orders placed yet. Add a product above to trigger your first Kafka event!
+          <div className="py-10 text-center text-zinc-500 font-mono text-xs">
+            No transactions found. Authorize an order above to initiate the distributed Kafka saga.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="text-[11px] text-slate-400 uppercase tracking-wider border-b border-slate-800/80">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2">
                 <tr>
-                  <th className="pb-3">Order ID</th>
-                  <th className="pb-3">Items</th>
-                  <th className="pb-3">Total</th>
-                  <th className="pb-3">Status</th>
-                  <th className="pb-3">Payment</th>
-                  <th className="pb-3">Inventory</th>
-                  <th className="pb-3 text-right">Technical Trace</th>
+                  <th className="pb-2.5">Order ID</th>
+                  <th className="pb-2.5">Items</th>
+                  <th className="pb-2.5">Total USD</th>
+                  <th className="pb-2.5">Saga Status</th>
+                  <th className="pb-2.5">Payment</th>
+                  <th className="pb-2.5">Inventory</th>
+                  <th className="pb-2.5 text-right">Distributed Trace</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-zinc-800/50">
                 {orders.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3.5 font-mono text-slate-300">{ord.id.slice(0, 8)}...</td>
-                    <td className="py-3.5 text-slate-300">{ord.items.length} item(s)</td>
-                    <td className="py-3.5 font-bold text-white">${ord.total_amount}</td>
-                    <td className="py-3.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  <tr key={ord.id} className="hover:bg-zinc-900/40 transition-colors">
+                    <td className="py-3 text-zinc-300 font-medium">{ord.id.slice(0, 8)}...</td>
+                    <td className="py-3 text-zinc-400 font-sans">{ord.items.length} sku(s)</td>
+                    <td className="py-3 text-zinc-100 font-bold">
+                      ${parseFloat(ord.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                         ord.status === 'CONFIRMED'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : ord.status === 'FAILED'
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30'
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                       }`}>
                         {ord.status}
                       </span>
                     </td>
-                    <td className="py-3.5">
-                      <span className={`text-[11px] font-medium ${
+                    <td className="py-3">
+                      <span className={`text-[11px] ${
                         ord.payment_status === 'SUCCEEDED' ? 'text-emerald-400' : 'text-amber-400'
                       }`}>
                         {ord.payment_status}
                       </span>
                     </td>
-                    <td className="py-3.5">
-                      <span className={`text-[11px] font-medium ${
-                        ord.inventory_status === 'RESERVED' ? 'text-emerald-400' : 'text-cyan-400'
+                    <td className="py-3">
+                      <span className={`text-[11px] ${
+                        ord.inventory_status === 'RESERVED' ? 'text-emerald-400' : 'text-zinc-400'
                       }`}>
                         {ord.inventory_status}
                       </span>
                     </td>
-                    <td className="py-3.5 text-right">
+                    <td className="py-3 text-right">
                       <button
                         onClick={() => onOpenTrace(ord.id)}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 transition-colors"
+                        className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/70 text-[11px] transition-colors"
                       >
-                        <Zap className="w-3 h-3 text-cyan-400" />
+                        <Terminal className="w-3 h-3 text-emerald-400" />
                         <span>Inspect Trace</span>
                       </button>
                     </td>
@@ -405,3 +459,4 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     </div>
   );
 };
+

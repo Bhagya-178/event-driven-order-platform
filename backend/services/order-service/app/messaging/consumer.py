@@ -9,6 +9,10 @@ from shared.events.schemas import EventEnvelope
 from shared.events.consumer_handler import ConsumerEventHandler
 from app.core.redis import redis_manager
 
+import json
+from aiokafka import AIOKafkaConsumer
+from app.core.config import settings
+
 logger = logging.getLogger("app.messaging.consumer")
 
 class OrderConsumer:
@@ -16,7 +20,11 @@ class OrderConsumer:
     Consumes events from payment and inventory topics to drive the Order state machine.
     Uses pessimistic row-locking on PostgreSQL and session locks on SQLite to prevent lost-update races.
     """
+    _sqlite_lock = asyncio.Lock()
+
     def __init__(self):
+        self.consumer = None
+        self.task = None
         self.handler = ConsumerEventHandler(
             consumer_name="order-service",
             dlq_publish_func=lambda topic, env: order_producer.publish_to_dlq(topic, env),
@@ -25,6 +33,36 @@ class OrderConsumer:
             initial_delay=0.01,
             backoff_factor=2.0
         )
+
+    async def start(self):
+        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+        self.consumer = AIOKafkaConsumer(
+            "payments.events", "inventory.events",
+            bootstrap_servers=bootstrap_servers,
+            group_id="order-service",
+            enable_auto_commit=False,
+            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        )
+        await self.consumer.start()
+        self.task = asyncio.create_task(self.consume())
+        logger.info("OrderConsumer started")
+
+    async def stop(self):
+        if self.task:
+            self.task.cancel()
+        if self.consumer:
+            await self.consumer.stop()
+            logger.info("OrderConsumer stopped")
+
+    async def consume(self):
+        try:
+            async for msg in self.consumer:
+                await self.handle_message(msg)
+                await self.consumer.commit()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Unexpected error in OrderConsumer loop: {e}", exc_info=True)
 
     async def handle_message(self, msg) -> bool:
         async def _process_wrapper(m):
@@ -41,8 +79,6 @@ class OrderConsumer:
             await self.process_event(event)
 
         return await self.handler.handle(msg, _process_wrapper)
-
-    _sqlite_lock = asyncio.Lock()
 
     async def process_event(self, event: EventEnvelope):
         async with AsyncSessionLocal() as session:

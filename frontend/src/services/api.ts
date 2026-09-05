@@ -1,46 +1,58 @@
 import { Order, OrderTrace, InventoryItem, ServiceHealth, CreateOrderPayload } from '../types';
 
-export const ORDER_API = 'http://localhost:8000';
-export const PAYMENT_API = 'http://localhost:8001';
-export const INVENTORY_API = 'http://localhost:8002';
+const getBaseHost = () => {
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    return window.location.hostname;
+  }
+  return 'localhost';
+};
 
-// Standard mock products mapped to UUIDs
+const host = getBaseHost();
+export const ORDER_API = (import.meta as any).env?.VITE_ORDER_API_URL || `http://${host}:8000`;
+export const PAYMENT_API = (import.meta as any).env?.VITE_PAYMENT_API_URL || `http://${host}:8001`;
+export const INVENTORY_API = (import.meta as any).env?.VITE_INVENTORY_API_URL || `http://${host}:8002`;
+
+// Production Enterprise Hardware Catalog
 export const CATALOG_PRODUCTS = [
   {
     product_id: "11111111-1111-1111-1111-111111111111",
-    name: "Enterprise Quantum Tensor Accelerator",
-    description: "High-density neural compute node with dedicated cryogenic interlinks.",
-    category: "Hardware",
-    price: 499.00,
-    badge: "Flash Sale",
-    specs: "8,192 Cores • 128GB HBM3e • PCIe 5.0"
+    name: "NVIDIA H100 SXM5 80GB",
+    description: "Fourth-generation Tensor Core GPU with dedicated Transformer Engine and 3.35 TB/s HBM3 memory bandwidth.",
+    category: "Compute Accelerator",
+    price: 32000.00,
+    badge: "High Contention",
+    specs: "80GB HBM3 • 3.35 TB/s • NVLink 4 • 700W SXM5",
+    sku: "NV-H100-SXM5-80G"
   },
   {
     product_id: "22222222-2222-2222-2222-222222222222",
-    name: "Distributed NVMe Storage Appliance",
-    description: "Sub-millisecond persistent event log cluster storage blade.",
-    category: "Storage",
-    price: 249.00,
-    badge: "Low Stock",
-    specs: "30TB Gen5 NVMe • 14GB/s Read • Dual 100GbE"
+    name: "AMD EPYC™ 9654 Genoa Blade",
+    description: "96 Cores / 192 Threads enterprise server processor with 384MB L3 Cache and 12-channel DDR5 memory.",
+    category: "Compute Node",
+    price: 11800.00,
+    badge: "Enterprise Standard",
+    specs: "96C / 192T • 3.70 GHz Max • 12x DDR5-4800 • SP5",
+    sku: "AMD-EPYC-9654-SP5"
   },
   {
     product_id: "33333333-3333-3333-3333-333333333333",
-    name: "Mesh Edge Telemetry Gateway",
-    description: "Ruggedized IoT event broker proxy for low-latency edge ingestion.",
-    category: "Networking",
-    price: 129.00,
-    badge: "Popular",
-    specs: "Quad-Core ARM • Dual SFP+ • Zero-Trust Enclave"
+    name: "Kioxia CD8-R 30.72TB NVMe SSD",
+    description: "PCIe 4.0 NVMe read-intensive solid-state drive engineered for ultra-high throughput event stream logs.",
+    category: "NVMe Storage",
+    price: 3450.00,
+    badge: "Sub-ms Latency",
+    specs: "30.72TB • 6,500 MB/s Seq Read • 1.25M IOPS • U.3",
+    sku: "KIO-CD8R-30TB-U3"
   },
   {
     product_id: "44444444-4444-4444-4444-444444444444",
-    name: "Redundant Hardware HSM Security Module",
-    description: "FIPS 140-3 Level 4 certified cryptographic signing appliance.",
-    category: "Security",
-    price: 389.00,
-    badge: "Enterprise",
-    specs: "Tamper-Evident • Zero-Zeroization • ECC/RSA Key Vault"
+    name: "YubiKey 5 FIPS HSM Cryptographic Key",
+    description: "FIPS 140-2 Level 3 validated hardware security module for zero-trust microservice signing.",
+    category: "Hardware Security",
+    price: 85.00,
+    badge: "FIPS 140-2 L3",
+    specs: "USB-A / NFC • RSA 4096 / ECC • PIV Smart Card",
+    sku: "YUBI-5-FIPS-SEC"
   }
 ];
 
@@ -60,13 +72,20 @@ export async function createOrder(
   const latencyMs = Math.round(performance.now() - start);
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Failed to create order (${res.status}): ${errText}`);
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const errJson = await res.json();
+      errMsg = errJson.message || errJson.detail || JSON.stringify(errJson);
+    } catch {
+      errMsg = await res.text();
+    }
+    throw new Error(errMsg);
   }
 
   const order = await res.json();
   return { order, latencyMs };
 }
+
 
 export async function getOrder(orderId: string): Promise<{ order: Order; latencyMs: number }> {
   const start = performance.now();
@@ -123,12 +142,12 @@ export async function restockInventory(productId: string, quantity: number): Pro
 export async function checkServiceHealth(name: string, port: number): Promise<ServiceHealth> {
   const start = performance.now();
   try {
-    const res = await fetch(`http://localhost:${port}/health/ready`, { method: 'GET' });
+    const res = await fetch(`http://${host}:${port}/health/ready`, { method: 'GET' });
     const latency_ms = Math.round(performance.now() - start);
     return {
       service: name,
       port,
-      status: res.ok ? 'UP' : 'DOWN',
+      status: res.ok ? 'UP' : (res.status === 503 ? 'DEGRADED' : 'DOWN'),
       latency_ms,
     };
   } catch (err) {
@@ -140,3 +159,4 @@ export async function checkServiceHealth(name: string, port: number): Promise<Se
     };
   }
 }
+

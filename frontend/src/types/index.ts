@@ -63,10 +63,11 @@ export interface InventoryItem {
 export interface ServiceHealth {
   service: string;
   port: number;
-  status: 'UP' | 'DOWN' | 'CHECKING';
+  status: 'UP' | 'DOWN' | 'CHECKING' | 'DEGRADED';
   latency_ms?: number;
   components?: Record<string, boolean>;
 }
+
 
 export interface CreateOrderPayload {
   customer_id: string;

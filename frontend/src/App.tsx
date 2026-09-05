@@ -55,7 +55,7 @@ export function App() {
   const handleClearCart = () => setCart([]);
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#0b0c10] text-zinc-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-zinc-950">
       <div>
         {/* Navigation Bar */}
         <Navbar
@@ -63,7 +63,6 @@ export function App() {
           onSwitchView={setCurrentView}
           cartCount={cart.reduce((sum, i) => sum + i.quantity, 0)}
           onOpenCart={() => {
-            // Scroll to cart if on customer view
             if (currentView !== 'customer') setCurrentView('customer');
           }}
           backendOnline={backendOnline}
@@ -92,13 +91,13 @@ export function App() {
         onClose={() => setActiveTraceOrderId(null)}
       />
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-8 bg-[#070a12] text-xs text-slate-500">
+      {/* Production Footer */}
+      <footer className="border-t border-zinc-800/80 py-6 bg-[#08090d] text-xs text-zinc-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <span className="font-bold text-slate-300">Event-Driven Order Platform</span>
+            <span className="font-semibold text-zinc-300">Nexus Platform Engine</span>
             <span>&bull;</span>
-            <span>Apache Kafka 7.5</span>
+            <span>Apache Kafka 7.5 (KRaft)</span>
             <span>&bull;</span>
             <span>PostgreSQL 15</span>
             <span>&bull;</span>
@@ -106,14 +105,15 @@ export function App() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <span className="text-indigo-400 font-mono">Transactional Outbox Pattern</span>
+            <span className="text-zinc-400">Transactional Outbox Pattern</span>
             <span>&bull;</span>
-            <span className="text-emerald-400 font-mono">55 Tests 100% Green</span>
+            <span className="text-emerald-400">55 Automated Tests Green</span>
           </div>
         </div>
       </footer>
     </div>
   );
+
 }
 
 export default App;

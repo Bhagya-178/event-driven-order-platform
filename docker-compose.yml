@@ -6,7 +6,7 @@ services:
     container_name: edp-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: <YOUR_PASSWORD>
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: default_db
     ports:
       - "5432:5432"
@@ -57,16 +57,16 @@ services:
       - /bin/sh
       - -c
       - |
-        echo "Waiting for Kafka to be ready..."
-        cub kafka-ready -b kafka:29092 1 30
-        echo "Creating topics..."
+        echo "Waiting for Kafka broker to be ready..."
+        cub kafka-ready -b kafka:29092 1 120
+        echo "Creating Kafka topics and DLQ channels..."
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic orders.events
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic payments.events
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic inventory.events
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic orders.events.dlq
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic payments.events.dlq
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic inventory.events.dlq
-        echo "Topics and DLQs created successfully."
+        echo "All Kafka topics and DLQs initialized successfully. Init job completed."
 
   prometheus:
     image: prom/prometheus:v2.48.0
@@ -84,7 +84,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      ORDER_DB_URL: postgresql+asyncpg://order_user:<YOUR_PASSWORD>@postgres:5432/orders_db
+      ORDER_DB_URL: postgresql+asyncpg://order_user:${ORDER_DB_PASSWORD:-order_pass}@postgres:5432/orders_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       REDIS_URL: redis://redis:6379/0
       ORDER_SERVICE_HOST: 0.0.0.0
@@ -94,8 +94,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
 
   payment-service:
     build:
@@ -105,7 +105,7 @@ services:
     ports:
       - "8001:8001"
     environment:
-      PAYMENT_DB_URL: postgresql+asyncpg://payment_user:<YOUR_PASSWORD>@postgres:5432/payments_db
+      PAYMENT_DB_URL: postgresql+asyncpg://payment_user:${PAYMENT_DB_PASSWORD:-payment_pass}@postgres:5432/payments_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       REDIS_URL: redis://redis:6379/0
       PAYMENT_PORT: 8001
@@ -114,8 +114,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
 
   inventory-service:
     build:
@@ -125,7 +125,7 @@ services:
     ports:
       - "8002:8002"
     environment:
-      INVENTORY_DB_URL: postgresql+asyncpg://inventory_user:<YOUR_PASSWORD>@postgres:5432/inventory_db
+      INVENTORY_DB_URL: postgresql+asyncpg://inventory_user:${INVENTORY_DB_PASSWORD:-inventory_pass}@postgres:5432/inventory_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       REDIS_URL: redis://redis:6379/0
       INVENTORY_PORT: 8002
@@ -134,8 +134,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
+
 
   frontend:
     build:
