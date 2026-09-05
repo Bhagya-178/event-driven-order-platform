@@ -19,3 +19,15 @@ class OrderRepository:
         stmt = select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def list_recent(self, limit: int = 50, offset: int = 0) -> list[Order]:
+        """Lists recent orders ordered chronologically descending."""
+        stmt = (
+            select(Order)
+            .options(selectinload(Order.items))
+            .order_by(Order.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

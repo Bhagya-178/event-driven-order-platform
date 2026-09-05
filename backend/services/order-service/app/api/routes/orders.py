@@ -1,15 +1,15 @@
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 import json
 import asyncio
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies import get_db, get_current_user
-from app.schemas.order import OrderCreate, OrderResponse
+from app.schemas.order import OrderCreate, OrderResponse, OrderTraceResponse
 from app.services.order_service import OrderService
 from app.core.redis import redis_manager
 from app.db.session import AsyncSessionLocal
@@ -30,6 +30,16 @@ async def create_order(
     # Ensure cache is fresh
     await redis_manager.delete(f"order:{order.id}")
     return order
+
+@router.get("/", response_model=List[OrderResponse])
+async def list_orders(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    service = OrderService(db)
+    return await service.list_orders(limit=limit, offset=offset)
 
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
@@ -55,3 +65,12 @@ async def get_order(
         pass
 
     return order
+
+@router.get("/{order_id}/trace", response_model=OrderTraceResponse)
+async def get_order_trace(
+    order_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    service = OrderService(db)
+    return await service.get_order_trace(order_id)

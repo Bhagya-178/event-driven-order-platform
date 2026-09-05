@@ -127,3 +127,103 @@ class OrderService:
         if not order:
             raise NotFoundError(f"Order {order_id} not found")
         return order
+
+    async def list_orders(self, limit: int = 50, offset: int = 0) -> list[Order]:
+        """Lists recent orders for the customer and business portals."""
+        return await self.order_repo.list_recent(limit=limit, offset=offset)
+
+    async def get_order_trace(self, order_id: UUID) -> dict:
+        """Constructs detailed technical trace for distributed saga visualization."""
+        order = await self.get_order(order_id)
+        outbox_events = await self.outbox_repo.get_by_aggregate_id(order_id)
+
+        milestones = [
+            {
+                "step": "ORDER_CREATED",
+                "service": "order-service",
+                "status": "COMPLETED",
+                "timestamp": order.created_at,
+                "detail": f"Order persisted with {len(order.items)} item(s) and outbox event staged atomically."
+            }
+        ]
+
+        if order.payment_status == "SUCCEEDED":
+            milestones.append({
+                "step": "PAYMENT_PROCESSING",
+                "service": "payment-service",
+                "status": "COMPLETED",
+                "timestamp": order.updated_at,
+                "detail": f"Payment of ${order.total_amount} {order.currency} captured via Payment Service."
+            })
+        elif order.payment_status == "FAILED":
+            milestones.append({
+                "step": "PAYMENT_PROCESSING",
+                "service": "payment-service",
+                "status": "FAILED",
+                "timestamp": order.updated_at,
+                "detail": "Payment transaction failed."
+            })
+        else:
+            milestones.append({
+                "step": "PAYMENT_PROCESSING",
+                "service": "payment-service",
+                "status": "IN_PROGRESS",
+                "timestamp": None,
+                "detail": "Awaiting PaymentSucceeded event from payments.events topic."
+            })
+
+        if order.inventory_status == "RESERVED":
+            milestones.append({
+                "step": "INVENTORY_RESERVATION",
+                "service": "inventory-service",
+                "status": "COMPLETED",
+                "timestamp": order.updated_at,
+                "detail": "Stock reserved using row locks and version increment."
+            })
+        elif order.inventory_status == "FAILED":
+            milestones.append({
+                "step": "INVENTORY_RESERVATION",
+                "service": "inventory-service",
+                "status": "FAILED",
+                "timestamp": order.updated_at,
+                "detail": "Stock reservation failed due to insufficient stock."
+            })
+        else:
+            milestones.append({
+                "step": "INVENTORY_RESERVATION",
+                "service": "inventory-service",
+                "status": "IN_PROGRESS",
+                "timestamp": None,
+                "detail": "Awaiting InventoryReserved event from inventory.events topic."
+            })
+
+        if order.status == "CONFIRMED":
+            milestones.append({
+                "step": "SAGA_COMPLETION",
+                "service": "order-service",
+                "status": "COMPLETED",
+                "timestamp": order.updated_at,
+                "detail": "Distributed saga completed successfully! Order is CONFIRMED."
+            })
+        elif order.status == "FAILED":
+            milestones.append({
+                "step": "SAGA_COMPENSATION",
+                "service": "order-service",
+                "status": "FAILED",
+                "timestamp": order.updated_at,
+                "detail": "Order marked FAILED; compensations applied."
+            })
+        else:
+            milestones.append({
+                "step": "SAGA_COORDINATION",
+                "service": "order-service",
+                "status": "PENDING",
+                "timestamp": None,
+                "detail": "State machine awaiting convergence of events."
+            })
+
+        return {
+            "order": order,
+            "saga_timeline": milestones,
+            "outbox_events": outbox_events
+        }

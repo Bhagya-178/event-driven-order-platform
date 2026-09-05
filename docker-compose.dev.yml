@@ -74,3 +74,17 @@ services:
       - "9090:9090"
     volumes:
       - ./backend/infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: edp-frontend-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+

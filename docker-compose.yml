@@ -136,3 +136,16 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: edp-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - order-service
+      - payment-service
+      - inventory-service
+

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from app.api.routes import orders, health
@@ -32,6 +33,15 @@ async def lifespan(app: FastAPI):
     await redis_manager.close()
 
 app = FastAPI(title="Order Service", version="0.1.0", lifespan=lifespan)
+
+# CORS Middleware for Frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Observability & Rate Limiting Middleware
 app.add_middleware(PrometheusMiddleware)

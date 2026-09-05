@@ -3,11 +3,39 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 from app.api.dependencies import get_db
-from app.schemas.inventory import ReservationCreate, ReservationResponse, InventoryResponse
+from app.schemas.inventory import ReservationCreate, ReservationResponse, InventoryResponse, RestockRequest
+from app.models.inventory import Inventory
 from app.services.inventory_service import InventoryService
 from app.repositories.inventory_repository import InventoryRepository
 
 router = APIRouter()
+
+@router.get("/", response_model=list[InventoryResponse])
+async def list_inventory(db: AsyncSession = Depends(get_db)):
+    repo = InventoryRepository(db)
+    return await repo.list_all()
+
+@router.post("/restock", response_model=InventoryResponse)
+async def restock_inventory(
+    data: RestockRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    repo = InventoryRepository(db)
+    inventory = await repo.get_by_product_id(data.product_id)
+    if not inventory:
+        inventory = Inventory(
+            product_id=data.product_id,
+            available_quantity=data.quantity,
+            reserved_quantity=0,
+            version=1
+        )
+        repo.add(inventory)
+    else:
+        inventory.available_quantity += data.quantity
+        inventory.version += 1
+    await db.commit()
+    await db.refresh(inventory)
+    return inventory
 
 @router.post("/reservations", response_model=ReservationResponse, status_code=status.HTTP_201_CREATED)
 async def reserve_stock(

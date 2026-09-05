@@ -6,6 +6,10 @@
   <img src="https://img.shields.io/badge/Apache_Kafka-7.5-231F20?style=for-the-badge&logo=apache-kafka&logoColor=white" alt="Kafka" />
   <img src="https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/Redis-7.0-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.6+-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-6.0-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
   <img src="https://img.shields.io/badge/Tests-55%20Total%20%7C%20100%25%20Green-success?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License" />
@@ -27,6 +31,7 @@
 * **Data Validation:** Pydantic v2
 * **Automated Testing:** pytest + pytest-asyncio (Unit, Integration, Concurrency, Failure & Chaos)
 * **Observability:** Prometheus metrics (`/metrics`) + Structured JSON Logging + Health Probes (`/health/live`, `/health/ready`) + OpenTelemetry ready
+* **Frontend Applications:** React 18+ / Vite / TypeScript / Tailwind CSS (Customer Storefront + Business SRE Console)
 
 ---
 
@@ -54,6 +59,7 @@
     * 15.6 [Targeting Individual Tests & Debugging Flags](#156-targeting-individual-tests--debugging-flags)
     * 15.7 [In-Memory SQLite Mechanics & Live Kafka Testing](#157-in-memory-sqlite-mechanics--live-kafka-testing)
 16. [Load Testing, Performance Benchmarking & Operational Runbook](#16-load-testing-performance-benchmarking--operational-runbook)
+17. [Frontend: Customer Storefront & SRE Operations Console](#17-frontend-customer-storefront--sre-operations-console)
 
 ---
 
@@ -815,6 +821,8 @@ PHASE 6 ──► Concurrency & Failure / Chaos Testing (COMPLETED)
 PHASE 7 ──► Redis + Observability + Docker (COMPLETED)
    ↓
 PHASE 8 ──► Load Testing + Runbooks & Benchmarking (COMPLETED)
+   ↓
+PHASE 9 ──► Dual-Experience Frontend Application (COMPLETED)
 ```
 
 ---
@@ -1090,4 +1098,66 @@ locust -f backend/load_tests/locustfile.py --host http://localhost:8000 --headle
 ### 3. SRE & Incident Response Runbook
 
 For production incident management, dead-letter queue recovery, outbox scaling, and Redis fail-open degradation playbooks, consult the comprehensive [Operational Runbook](docs/RUNBOOK.md).
+
+---
+
+## 17. Frontend: Customer Storefront & SRE Operations Console
+
+The platform includes a modern web application built with **React 18+, Vite 6, TypeScript, and Tailwind CSS** providing two homepages:
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        EVENT-DRIVEN ORDER PLATFORM — FRONTEND                          │
+├──────────────────────────────────────────┬─────────────────────────────────────────────┤
+│         1. CUSTOMER STOREFRONT           │         2. BUSINESS & SRE CONSOLE           │
+│                                          │                                             │
+│  - Clean e-commerce shopping experience  │  - Executive KPI Ribbon (Revenue, Volume)   │
+│  - Real-time inventory stock indicators  │  - Real-time Saga Architecture Visualizer   │
+│  - One-click idempotent checkout         │  - Warehouse inventory restocking controls  │
+│  - [⚡ Inspect System Internals Button]  │  - [⚡ Flash-Sale 20-User Concurrency Test] │
+│    ↳ Opens live Kafka Saga trace drawer, │  - [🛑 Rate Limiter 120-Request Burst Test] │
+│      Transactional Outbox records &      │  - [🔍 Dead-Letter Queue (DLQ) Inspector]   │
+│      Idempotency retry proof             │  - Fleet Health Probes (:8000, :8001, :8002)│
+└──────────────────────────────────────────┴─────────────────────────────────────────────┘
+```
+
+### 17.1 Customer Storefront (`/user`)
+* **Standard E-Commerce Flow:** Normal buyers can browse high-density hardware accelerators, check live stock, add items to cart, and check out with automated UUID idempotency keys.
+* **On-Demand Technical Trace Inspector:** When an order is created, clicking **"Inspect Distributed Saga & Kafka Trace"** opens a slide-over telemetry drawer displaying:
+  1. **Choreographed Microservices Node Diagram:** Live state indicators across Order, Payment, and Inventory services.
+  2. **Distributed Execution Timeline:** Step-by-step saga milestones with microsecond UTC timestamps.
+  3. **Transactional Outbox Records:** Exact outbox events stored in PostgreSQL with `status = 'PUBLISHED'`.
+  4. **Live Idempotency Proof Button:** Simulates a network retry with the identical key to prove that the backend returns the exact same order without double billing.
+
+### 17.2 Business & SRE Operations Console (`/business`)
+* **Executive Metrics Ribbon:** Gross revenue, order volume, saga confirmation rates, and warehouse stock counts.
+* **Warehouse Stock Management:** Live table of all products with instant `+10 Units` restocking actions.
+* **Interactive Chaos & Contention Control Deck:**
+  - **⚡ Flash-Sale Concurrency Simulator:** Spawns 20 concurrent HTTP requests competing for 5 stock units. The UI displays the live breakdown (5 succeeded with HTTP 201, 15 rejected with 400/409), proving **zero overselling live in the browser**.
+  - **🛑 Rate Limiter Burst Test:** Fires 120 rapid requests in under 2 seconds to trigger the Redis sliding-window limiter, displaying `HTTP 429 Too Many Requests` toasts with countdown timers.
+* **Fleet Health Probes:** Real-time ping cards for Order Service (`:8000`), Payment Service (`:8001`), and Inventory Service (`:8002`).
+
+### 17.3 Running the Frontend Locally
+
+#### Development Mode (Fast HMR):
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:5173 in your browser
+```
+
+#### Production Build & Preview:
+```bash
+cd frontend
+npm run build
+npm run preview
+```
+
+#### Docker Container (Optional):
+```bash
+docker-compose up -d frontend
+# Access on http://localhost:3000
+```
+
 

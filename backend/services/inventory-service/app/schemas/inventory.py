@@ -25,3 +25,7 @@ class ReservationResponse(BaseModel):
     expires_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+class RestockRequest(BaseModel):
+    product_id: UUID
+    quantity: int = Field(gt=0)

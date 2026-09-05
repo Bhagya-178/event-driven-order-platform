@@ -12,6 +12,10 @@ class InventoryRepository:
         result = await self.session.execute(select(Inventory).where(Inventory.product_id == product_id))
         return result.scalars().first()
 
+    async def list_all(self) -> list[Inventory]:
+        result = await self.session.execute(select(Inventory))
+        return list(result.scalars().all())
+
     def add(self, inventory: Inventory):
         self.session.add(inventory)
 

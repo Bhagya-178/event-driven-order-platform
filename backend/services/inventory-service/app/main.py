@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import sys
 import os
@@ -29,6 +30,15 @@ async def lifespan(app: FastAPI):
     await redis_manager.close()
 
 app = FastAPI(title="Inventory Service", version="0.1.0", lifespan=lifespan)
+
+# CORS Middleware for Frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Observability & Rate Limiting Middleware
 app.add_middleware(PrometheusMiddleware)
