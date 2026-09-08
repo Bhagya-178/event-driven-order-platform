@@ -85,20 +85,3 @@ class DeadLetterEnvelope(BaseModel):
     failed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     payload: Any
 
-class DeadLetterEnvelope(BaseModel):
-    """
-    Standard forensic envelope for dead-lettered messages.
-    Captures complete context of failure, partition coordinates, and payload.
-    """
-    dlq_id: UUID = Field(default_factory=uuid4)
-    original_topic: str
-    original_partition: int
-    original_offset: int
-    original_key: Optional[str] = None
-    error_type: str
-    error_message: str
-    stack_trace: Optional[str] = None
-    retry_count: int
-    failed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    payload: Any
-

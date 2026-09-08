@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 class OrderItemCreate(BaseModel):
     product_id: UUID
     quantity: int = Field(gt=0)
+    unit_price: Optional[Decimal] = None
 
 class OrderCreate(BaseModel):
     customer_id: UUID

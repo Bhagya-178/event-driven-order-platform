@@ -4,7 +4,7 @@ import {
   Plus, Minus, Trash2, RefreshCw, Terminal, 
   AlertCircle, ShoppingCart
 } from 'lucide-react';
-import { CATALOG_PRODUCTS, createOrder, listOrders, listInventory } from '../services/api';
+import { CATALOG_PRODUCTS, createOrder, listOrders, listInventory, generateUUID } from '../services/api';
 import { Order } from '../types';
 
 interface CustomerPortalProps {
@@ -65,7 +65,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     if (cart.length === 0) return;
     setSubmitting(true);
     setOrderError(null);
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKey = generateUUID();
 
     try {
       const payload = {
@@ -410,10 +410,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               <tbody className="divide-y divide-zinc-800/50">
                 {orders.map((ord) => (
                   <tr key={ord.id} className="hover:bg-zinc-900/40 transition-colors">
-                    <td className="py-3 text-zinc-300 font-medium">{ord.id.slice(0, 8)}...</td>
-                    <td className="py-3 text-zinc-400 font-sans">{ord.items.length} sku(s)</td>
+                    <td className="py-3 text-zinc-300 font-medium">{(ord.id || '').slice(0, 8)}...</td>
+                    <td className="py-3 text-zinc-400 font-sans">{(ord.items || []).length} sku(s)</td>
                     <td className="py-3 text-zinc-100 font-bold">
-                      ${parseFloat(ord.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ${parseFloat(ord.total_amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td className="py-3">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${

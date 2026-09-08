@@ -63,7 +63,7 @@ export const SagaTraceDrawer: React.FC<SagaTraceDrawerProps> = ({ orderId, onClo
     try {
       const payload = {
         customer_id: trace.order.customer_id,
-        items: trace.order.items.map(item => ({
+        items: (trace.order.items || []).map(item => ({
           product_id: item.product_id,
           quantity: item.quantity
         }))

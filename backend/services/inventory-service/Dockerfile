@@ -16,7 +16,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e /build/backend/shared && \
+    pip install --no-cache-dir /build/backend/shared && \
     pip install --no-cache-dir -r /build/backend/services/inventory-service/requirements.txt \
     redis prometheus-client
 

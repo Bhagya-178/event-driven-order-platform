@@ -12,7 +12,7 @@ class OrderProducer:
 
     async def start(self):
         # We assume Kafka is reachable via KAFKA_BOOTSTRAP_SERVERS, default to localhost:9092
-        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", None) or "localhost:9092"
         self.producer = AIOKafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
@@ -20,6 +20,15 @@ class OrderProducer:
             acks='all',  # Rule 9: Producers MUST use acknowledgements (acks=all)
             enable_idempotence=True
         )
+        import asyncio
+        for attempt in range(1, 6):
+            try:
+                await self.producer.start()
+                logger.info("OrderProducer started")
+                return
+            except Exception as e:
+                logger.warning(f"OrderProducer start attempt {attempt}/5 failed ({e}), retrying in 2s...")
+                await asyncio.sleep(2)
         await self.producer.start()
         logger.info("OrderProducer started")
 

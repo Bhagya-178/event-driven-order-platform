@@ -12,6 +12,28 @@ export const ORDER_API = (import.meta as any).env?.VITE_ORDER_API_URL || `http:/
 export const PAYMENT_API = (import.meta as any).env?.VITE_PAYMENT_API_URL || `http://${host}:8001`;
 export const INVENTORY_API = (import.meta as any).env?.VITE_INVENTORY_API_URL || `http://${host}:8002`;
 
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // Insecure context fallback
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export function getServiceBaseUrl(port: number): string {
+  if (port === 8000) return ORDER_API;
+  if (port === 8001) return PAYMENT_API;
+  if (port === 8002) return INVENTORY_API;
+  return `http://${host}:${port}`;
+}
+
 // Production Enterprise Hardware Catalog
 export const CATALOG_PRODUCTS = [
   {
@@ -141,8 +163,9 @@ export async function restockInventory(productId: string, quantity: number): Pro
 
 export async function checkServiceHealth(name: string, port: number): Promise<ServiceHealth> {
   const start = performance.now();
+  const baseUrl = getServiceBaseUrl(port);
   try {
-    const res = await fetch(`http://${host}:${port}/health/ready`, { method: 'GET' });
+    const res = await fetch(`${baseUrl}/health/ready`, { method: 'GET' });
     const latency_ms = Math.round(performance.now() - start);
     return {
       service: name,

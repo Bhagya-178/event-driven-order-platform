@@ -11,7 +11,7 @@ class PaymentProducer:
         self.producer = None
 
     async def start(self):
-        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", None) or "localhost:9092"
         self.producer = AIOKafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
@@ -19,6 +19,15 @@ class PaymentProducer:
             acks='all',
             enable_idempotence=True
         )
+        import asyncio
+        for attempt in range(1, 6):
+            try:
+                await self.producer.start()
+                logger.info("PaymentProducer started")
+                return
+            except Exception as e:
+                logger.warning(f"PaymentProducer start attempt {attempt}/5 failed ({e}), retrying in 2s...")
+                await asyncio.sleep(2)
         await self.producer.start()
         logger.info("PaymentProducer started")
 

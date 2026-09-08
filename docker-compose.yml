@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: default_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./backend/infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
@@ -136,7 +136,6 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-
 
   frontend:
     build:

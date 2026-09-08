@@ -43,8 +43,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.rate_limiter = rate_limiter
 
     async def dispatch(self, request: Request, call_next):
-        # Exclude metrics and health endpoints from rate limits
-        if request.url.path in ["/metrics", "/health", "/health/live", "/health/ready"]:
+        # Exclude CORS preflight, metrics, and health endpoints from rate limits
+        if request.method == "OPTIONS" or request.url.path.startswith("/health") or request.url.path == "/metrics":
             return await call_next(request)
 
         # Identify client by IP or X-Forwarded-For

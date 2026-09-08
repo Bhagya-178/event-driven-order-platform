@@ -32,17 +32,18 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         async with AsyncSessionLocal() as session:
-            res = await session.execute(select(Inventory))
-            if not res.scalars().first():
-                catalog_ids = [
-                    uuid.UUID("11111111-1111-1111-1111-111111111111"),
-                    uuid.UUID("22222222-2222-2222-2222-222222222222"),
-                    uuid.UUID("33333333-3333-3333-3333-333333333333"),
-                    uuid.UUID("44444444-4444-4444-4444-444444444444"),
-                ]
-                for cid in catalog_ids:
-                    session.add(Inventory(product_id=cid, available_quantity=100, reserved_quantity=0))
-                await session.commit()
+            catalog_ids = [
+                uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                uuid.UUID("22222222-2222-2222-2222-222222222222"),
+                uuid.UUID("33333333-3333-3333-3333-333333333333"),
+                uuid.UUID("44444444-4444-4444-4444-444444444444"),
+            ]
+            for cid in catalog_ids:
+                stmt = select(Inventory).where(Inventory.product_id == cid)
+                res = (await session.execute(stmt)).scalars().first()
+                if not res:
+                    session.add(Inventory(id=uuid.uuid4(), product_id=cid, available_quantity=100, reserved_quantity=0, version=1))
+            await session.commit()
     except Exception as e:
         print(f"Warning: Inventory DB init / seed: {e}")
     await redis_manager.connect()
@@ -58,20 +59,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Inventory Service", version="0.1.0", lifespan=lifespan)
 
-# CORS Middleware for Frontend
+# Observability & Rate Limiting Middleware
+app.add_middleware(PrometheusMiddleware)
+if getattr(settings, "ENABLE_RATE_LIMITING", True):
+    rate_limiter = RateLimiter(redis_manager, max_requests=100, window_seconds=60)
+    app.add_middleware(RateLimiterMiddleware, rate_limiter=rate_limiter)
+
+# CORS Middleware for Frontend (outermost middleware to ensure 429 and error responses carry CORS headers)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*", "Retry-After", "Idempotency-Key"],
 )
-
-# Observability & Rate Limiting Middleware
-app.add_middleware(PrometheusMiddleware)
-if getattr(settings, "ENABLE_RATE_LIMITING", True):
-    rate_limiter = RateLimiter(redis_manager, max_requests=100, window_seconds=60)
-    app.add_middleware(RateLimiterMiddleware, rate_limiter=rate_limiter)
 
 @app.get("/metrics", include_in_schema=False)
 async def prometheus_metrics():

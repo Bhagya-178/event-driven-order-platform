@@ -35,7 +35,7 @@ class OrderConsumer:
         )
 
     async def start(self):
-        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+        bootstrap_servers = getattr(settings, "KAFKA_BOOTSTRAP_SERVERS", None) or "localhost:9092"
         self.consumer = AIOKafkaConsumer(
             "payments.events", "inventory.events",
             bootstrap_servers=bootstrap_servers,
@@ -43,6 +43,15 @@ class OrderConsumer:
             enable_auto_commit=False,
             value_deserializer=lambda x: json.loads(x.decode('utf-8'))
         )
+        for attempt in range(1, 6):
+            try:
+                await self.consumer.start()
+                self.task = asyncio.create_task(self.consume())
+                logger.info("OrderConsumer started")
+                return
+            except Exception as e:
+                logger.warning(f"OrderConsumer start attempt {attempt}/5 failed ({e}), retrying in 2s...")
+                await asyncio.sleep(2)
         await self.consumer.start()
         self.task = asyncio.create_task(self.consume())
         logger.info("OrderConsumer started")

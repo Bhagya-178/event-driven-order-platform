@@ -43,20 +43,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Payment Service", version="0.1.0", lifespan=lifespan)
 
-# CORS Middleware for Frontend
+# Observability & Rate Limiting Middleware
+app.add_middleware(PrometheusMiddleware)
+if getattr(settings, "ENABLE_RATE_LIMITING", True):
+    rate_limiter = RateLimiter(redis_manager, max_requests=100, window_seconds=60)
+    app.add_middleware(RateLimiterMiddleware, rate_limiter=rate_limiter)
+
+# CORS Middleware for Frontend (outermost middleware to ensure 429 and error responses carry CORS headers)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*", "Retry-After", "Idempotency-Key"],
 )
-
-# Observability & Rate Limiting Middleware
-app.add_middleware(PrometheusMiddleware)
-if getattr(settings, "ENABLE_RATE_LIMITING", True):
-    rate_limiter = RateLimiter(redis_manager, max_requests=100, window_seconds=60)
-    app.add_middleware(RateLimiterMiddleware, rate_limiter=rate_limiter)
 
 @app.get("/metrics", include_in_schema=False)
 async def prometheus_metrics():

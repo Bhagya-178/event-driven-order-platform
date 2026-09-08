@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { 
   listOrders, listInventory, restockInventory, 
-  checkServiceHealth, ORDER_API, INVENTORY_API, CATALOG_PRODUCTS 
+  checkServiceHealth, ORDER_API, INVENTORY_API, CATALOG_PRODUCTS, generateUUID 
 } from '../services/api';
 import { Order, InventoryItem, ServiceHealth } from '../types';
 
@@ -96,7 +96,7 @@ export const BusinessPortal: React.FC = () => {
     const start = performance.now();
     const concurrentRequests = 20;
     const requests = Array.from({ length: concurrentRequests }).map(async (_, idx) => {
-      const orderId = crypto.randomUUID();
+      const orderId = generateUUID();
       try {
         const res = await fetch(`${INVENTORY_API}/inventory/reservations`, {
           method: 'POST',

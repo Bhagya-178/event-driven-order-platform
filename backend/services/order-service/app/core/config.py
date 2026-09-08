@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     REDIS_URL: str = "redis://localhost:6379/0"
     ENABLE_RATE_LIMITING: bool = True
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
 
     model_config = SettingsConfigDict(
         env_file="../../.env",

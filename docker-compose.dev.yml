@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: default_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./backend/infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
@@ -82,9 +82,69 @@ services:
     container_name: edp-frontend-dev
     ports:
       - "5173:5173"
+      - "3000:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
+  order-service:
+    build:
+      context: .
+      dockerfile: backend/services/order-service/Dockerfile
+    container_name: edp-order-service
+    ports:
+      - "8000:8000"
+    environment:
+      ORDER_DB_URL: postgresql+asyncpg://order_user:${ORDER_DB_PASSWORD:-order_pass}@postgres:5432/orders_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_URL: redis://redis:6379/0
+      ORDER_SERVICE_HOST: 0.0.0.0
+      ORDER_SERVICE_PORT: 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
+  payment-service:
+    build:
+      context: .
+      dockerfile: backend/services/payment-service/Dockerfile
+    container_name: edp-payment-service
+    ports:
+      - "8001:8001"
+    environment:
+      PAYMENT_DB_URL: postgresql+asyncpg://payment_user:${PAYMENT_DB_PASSWORD:-payment_pass}@postgres:5432/payments_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_URL: redis://redis:6379/0
+      PAYMENT_PORT: 8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: backend/services/inventory-service/Dockerfile
+    container_name: edp-inventory-service
+    ports:
+      - "8002:8002"
+    environment:
+      INVENTORY_DB_URL: postgresql+asyncpg://inventory_user:${INVENTORY_DB_PASSWORD:-inventory_pass}@postgres:5432/inventory_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_URL: redis://redis:6379/0
+      INVENTORY_PORT: 8002
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
